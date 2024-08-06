@@ -26,8 +26,10 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
     Change below model number and class number to train either linear or non-linear model.
     v1 = linear model
     v2 = nonlinear model
+
+    Model Number convention: v{1 or 2}_{version}
 """
-model_num = "v2_3"
+model_num = "v1_3"
 model = classifiers.PtClassifier_V2(
     parameters=len(clock_data_total_fail[0]['df'].columns[1:-1]),
     classes=1
@@ -51,6 +53,7 @@ total_loss_test = []
 total_acc_train = []
 total_acc_test = []
 
+torch.manual_seed(42)
 #%% 2) Split clock data into test and training sets
 """ Split data to Train/Test and train model """
 for count, clock in enumerate(clock_data_total_fail):

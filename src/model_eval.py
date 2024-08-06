@@ -11,11 +11,11 @@ from torchmetrics import ConfusionMatrix
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # 1) Obtain clock data from specified data folders. Set device agnostic code and get model.
-clock_data_total_fail: list[dict] = dataHandler.logFileToDict(dataHandler.DATAFOLDER_FAIL_PASSEDLATER)
+clock_data_total_fail: list[dict] = dataHandler.logFileToDict(dataHandler.DATAFOLDER_FAIL)
 
 # %% Loading saved models.
 """ Load model for evaluation NOTE: Adjust model_num to select proper model """
-model_num = "v2_3"
+model_num = "v1_3"
 path_model = dataHandler.DATAFOLDER_FAIL + r'/Models/csac_ml_' + str(model_num) + r'.pt'
 model_load = classifiers.PtClassifier_V2(
     parameters=len(clock_data_total_fail[0]['df'].columns[1:-1]),
@@ -56,7 +56,7 @@ with torch.inference_mode():
 
 #%% Plot results
 fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(22, 6))
-f_figs = dataHandler.createDataFolder(dataHandler.DATAFOLDER_FAIL_PASSEDLATER, "Figs")
+f_figs = dataHandler.createDataFolder(dataHandler.DATAFOLDER_FAIL, "Figs")
 plot_num = 0
 for i, p in enumerate(clock_model_predictions):
     #secs = clock_data_total_fail[i]['df']['SECS']
@@ -88,24 +88,24 @@ for i, p in enumerate(clock_model_predictions):
 
 
 #%% Plotting the confusion matrix using Matplotlib
-fig, ax = plt.subplots(figsize=(8, 6))
-cax = ax.matshow(clock_model_cm[0], cmap='Blues')
-num_classes = 2
-# Add color bar
-fig.colorbar(cax)
+# fig, ax = plt.subplots(figsize=(8, 6))
+# cax = ax.matshow(clock_model_cm[0], cmap='Blues')
+# num_classes = 2
+# # Add color bar
+# fig.colorbar(cax)
 
-# Add labels and title
-classes = [f'Class {i}' for i in range(num_classes)]
-ax.set_xticks(np.arange(num_classes))
-ax.set_yticks(np.arange(num_classes))
-ax.set_xticklabels(classes)
-ax.set_yticklabels(classes)
-ax.set_xlabel('Predicted Label')
-ax.set_ylabel('True Label')
-ax.set_title('Confusion Matrix')
+# # Add labels and title
+# classes = [f'Class {i}' for i in range(num_classes)]
+# ax.set_xticks(np.arange(num_classes))
+# ax.set_yticks(np.arange(num_classes))
+# ax.set_xticklabels(classes)
+# ax.set_yticklabels(classes)
+# ax.set_xlabel('Predicted Label')
+# ax.set_ylabel('True Label')
+# ax.set_title('Confusion Matrix')
 
-# Annotate the matrix with text
-for i in range(num_classes):
-    for j in range(num_classes):
-        ax.text(j, i, clock_model_cm[0][i, j], ha='center', va='center', color='black')
+# # Annotate the matrix with text
+# for i in range(num_classes):
+#     for j in range(num_classes):
+#         ax.text(j, i, clock_model_cm[0][i, j], ha='center', va='center', color='black')
 # %%

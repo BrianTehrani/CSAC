@@ -211,12 +211,12 @@ def logFileToDict(logFolderPath:str) -> list[dict]:
                 clock_sn:str   = logFile.name[logFile.name.find("-")+1:logFile.name.find("_")]
                 clock_freq:str = logFile.name[:logFile.name.find("-")]
 
-                if clock_freq == "SN10": #Focus on 10MHz clocks
-                    clock_data['sn'] = clock_sn
-                    clock_data['freq'] = clock_freq
-                    clock_data['df'] = parseLogDataFrame(pd.read_csv(logFile.path, sep=','))
-                    
-                    clock_data_total.append(clock_data)
+                # if clock_freq == "SN10": #Focus on 10MHz clocks
+                clock_data['sn'] = clock_sn
+                clock_data['freq'] = clock_freq
+                clock_data['df'] = parseLogDataFrame(pd.read_csv(logFile.path, sep=','))
+                
+                clock_data_total.append(clock_data)
 
     return clock_data_total
 
