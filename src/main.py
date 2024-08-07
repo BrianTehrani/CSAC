@@ -79,7 +79,7 @@ for count, clock in enumerate(clock_data_total_fail):
     y_train = torch.Tensor(y_train).to(device)
     y_test = torch.Tensor(y_test).to(device)
 
-    torch.manual_seed(42)
+    # torch.manual_seed(42)
     v_loss_train = []
     v_loss_test  = []
     v_acc_train  = []
