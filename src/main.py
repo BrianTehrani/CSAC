@@ -8,8 +8,7 @@ import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-import torchmetrics
-import torchmetrics.classification
+from torchmetrics.classification import BinaryAccuracy
 
 """ User created files to handle model creation and CSAC LOG data files. """
 import classifiers, dataHandler, time
@@ -18,9 +17,10 @@ import classifiers, dataHandler, time
 #%% 1) Obtain clock data from specified data folders. Set device agnostic code and get model.
 """ Obtain clock data, set loss and optimizer functions """
 clock_data_total_fail: list[dict] = dataHandler.logFileToDict(dataHandler.DATAFOLDER_FAIL)
+# clock_data_total_pass: list[dict] = dataHandler.logFileToDict(dataHandler.DATAFOLDER_PASS)
+# clock_data_total_failPassLater: list[dict] = dataHandler.logFileToDict(dataHandler.DATAFOLDER_FAIL_PASSEDLATER)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 """
     Change below model number and class number to train either linear or non-linear model.
@@ -37,8 +37,7 @@ model = classifiers.PtClassifier_V2(
 model.to(device)
 optimizer = optim.Adam(model.parameters())
 criterion = torch.nn.BCEWithLogitsLoss()
-tm_binary_acc = torchmetrics.classification.BinaryAccuracy().to(device)
-tm_cm = torchmetrics.ConfusionMatrix(task="binary", num_classes=2).to(device)
+tm_binary_acc = BinaryAccuracy().to(device)
 
 EPOCHS = 100
 # BATCH_SIZE = 8
@@ -101,7 +100,6 @@ for count, clock in enumerate(clock_data_total_fail):
 
         # Evaluation Metrics
         acc = tm_binary_acc(p_train.squeeze(), y_train)
-        cm = tm_cm(p_train, y_train)
 
         optimizer.zero_grad()
 
@@ -159,11 +157,12 @@ for count, clock in enumerate(clock_data_total_fail):
             #     ax[1].set_yticks([0, 1])
 
             #     plt.tight_layout()
-    #cm_train.append(tm_cm(p_train, y_train))
     total_loss_train.append(v_loss_train)
     total_loss_test.append(v_loss_test)
     total_acc_train.append(v_acc_train)
     total_acc_test.append(v_acc_test)
+
+
             
 
 #%% Length of loss and accuracy
