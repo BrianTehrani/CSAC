@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import numpy as np
 from torchmetrics import ConfusionMatrix
+from mlxtend.plotting import plot_confusion_matrix
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -55,15 +56,16 @@ with torch.inference_mode():
         # clock_model_cm.append(cm.cpu().numpy())
 
 #%% Plot results
-fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(22, 6))
+NCOLS = 3
+fig, ax = plt.subplots(nrows=2, ncols=NCOLS, figsize=(22, 6))
 f_figs = dataHandler.createDataFolder(dataHandler.DATAFOLDER_FAIL, "Figs")
-plot_num = 0
+plot_num = 1
 for i, p in enumerate(clock_model_predictions):
     #secs = clock_data_total_fail[i]['df']['SECS']
     #fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(22, 6))
-    graph_check = i % 3
+    graph_check = i % NCOLS
 
-    print("Graph Check: ", graph_check)
+    # print("Graph Check: ", graph_check)
     ax[0][graph_check].plot(p.numpy(), color='r')
     ax[0][graph_check].set_xlabel('secs')
     ax[0][graph_check].set_title(clock_data_total_fail[i]['sn'] + f' Model {model_num} Predictions | Count: ' + str(np.sum(p.numpy())), loc='center')
@@ -77,13 +79,46 @@ for i, p in enumerate(clock_model_predictions):
     plt.tight_layout()
     
     #plt.suptitle("", horizontalalignment='center')
-    if graph_check == 2:
+    if ((graph_check + 1) == NCOLS):
         
         plt.savefig(f_figs + r'/Validations/' + f"Validate_Predicts_{model_num}_" + str(plot_num) +'.png')
         plt.close()
         plt.clf()
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(22, 6))
         plot_num+=1
+
+plt.savefig(f_figs + r'/Validations/' + f"Validate_Predicts_{model_num}_" + str(plot_num) +'.png')
+plt.close()
+plt.clf()
+print(f"Save validations to {f_figs}+ /Validations")
+
+#%% Plotting Confusion Matrix
+''' Plotting Confusion Matrix on a single figure. '''
+cm_dict = {
+    0: 'Pass',
+    1: 'Fail'
+}
+cm = ConfusionMatrix(task='binary', num_classes=2)
+fig, axs = plt.subplots(nrows=4, ncols=5, figsize=(20, 20))
+axs = axs.flat
+for i, clock_model_prediction in enumerate(clock_model_predictions):
+    cm_tensor = cm(preds=clock_model_prediction,
+                   target= torch.tensor(clock_model_actuals[i]))
+    
+    axs[i].set_title(f'Clock {clock_data_total_fail[i]['sn']}')
+    plot_confusion_matrix(
+        conf_mat=cm_tensor.numpy(),
+        class_names=cm_dict.values(),
+        figsize=(3,3),
+        axis=axs[i],
+        figure=fig
+    )
+
+plt.suptitle(f"Confusion Matrix Across Clock Data Model {model_num}")
+plt.tight_layout()
+plt.savefig(f_figs + r'/Validations/' + f"Confusion_Matrix_{model_num}.png")
+
+
 
 
 
