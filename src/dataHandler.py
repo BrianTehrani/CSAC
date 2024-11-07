@@ -1,13 +1,16 @@
 '''
     File used to handle Tempco LOG files.
 '''
+#%%
 ###
 # Common Imports
 ###
-import os
+import os, torch 
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import Dataset, DataLoader
 
 DATAFOLDER_FAIL = r"D:\Data\Tempco\fail"
 DATAFOLDER_PASS = r"D:\Data\Tempco\pass"
@@ -19,7 +22,7 @@ L_DROP_PARAMS = [
                     ' PDS1', ' DCI', ' VFALIM', ' FTUNE', ' PM_CNTS', ' RFLW',
                     ' PM_NSEC', ' VQPA', ' VQP', ' TEMPCO', ' HTUNE', ' DATE',
                     'PDS1', 'DCI', 'VFALIM', 'FTUNE', 'PM_CNTS', 'RFLW',
-                    'PM_NSEC', 'VQPA', 'VQP', 'TEMPCO', 'HTUNE', 'DATE'
+                    'PM_NSEC', 'VQPA', 'VQP', 'TEMPCO', 'HTUNE', 'DATE', 'SECS', ' SECS'
                 ]
 
 def createDataFolder(dataFolderPath:str, dataFolder:str) -> str:
@@ -301,17 +304,51 @@ def statsLogData(logFolderPath:str) -> pd.DataFrame:
     print(f"Successfully written to: {f_Excel}" + r'/clock_stats.xlsx')
 
 
-if __name__ == "__main__":
-    # logToExcel(DATAFOLDER_FAIL)
-    # plotLogData(DATAFOLDER_PASS)
-    # plotLogData(DATAFOLDER_FAIL)
-    # plotLogData(DATAFOLDER_FAIL_PASSEDLATER)
-    statsLogData(DATAFOLDER_PASS)
-    # statsLogData(DATAFOLDER_FAIL_PASSEDLATER)
-    # boxPlotLogData(DATAFOLDER_FAIL)
-    # boxPlotLogData(DATAFOLDER_PASS)
-    # boxPlotLogData(DATAFOLDER_FAIL_PASSEDLATER)
-    # df = logFileToDict(DATAFOLDER_FAIL)
+class ClockDataset(Dataset):
+    '''
+        TempCo clock dataset wrapped in a Pytorch dataset class.
+        
+        Will only include clock params that are not in list L_DROP_PARAMS.
+    '''
+    def __init__(self, f_data:str, transform=None) -> None:
+        super().__init__()
+        self.f_clock_paths = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(f_data) for f in filenames]
+        self.transform = transform
+    
+    def __len__(self) -> int:
+        return len(self.f_clock_paths)
+    
+    def __getitem__(self, index):
+        clock_path = self.f_clock_paths[index]
+        clock_validation = os.path.basename(os.path.dirname(clock_path))
+        
+        clock_data = parseLogDataFrame(pd.read_csv(clock_path))
 
-    # for f in df:
-    #     print(f"clock sn: {f['sn']}")
+        clock_params = torch.Tensor(clock_data.iloc[:, :-1].to_numpy()).to(torch.float32)
+        clock_param_labels =  torch.Tensor(clock_data.iloc[:, -1].to_numpy()).unsqueeze(1).to(torch.int64)
+        clock_columns = clock_data.columns.to_list()
+
+        # if self.transform:
+        #     scalar = StandardScaler()
+        #     clock_params = scalar.fit_transform(self.transform(clock_params))
+
+        return clock_params, clock_param_labels, clock_columns, clock_validation
+
+#%%
+if __name__ == "__main__":
+    TEST_DATASET  = os.path.join(os.getcwd(), r"data\test")
+    TRAIN_DATASET = os.path.join(os.getcwd(), r"data\train")
+    clock_dataset_test = ClockDataset(f_data=TEST_DATASET)
+    clock_dataset_train = ClockDataset(f_data=TRAIN_DATASET)
+
+    # print(f"Length of test dataset:  {clock_dataset_test.__len__()}")
+    # print(f"Length of train dataset: {clock_dataset_train.__len__()}")
+    # print(clock_dataset_train[0])
+
+    train_dataloader = DataLoader(dataset=clock_dataset_train,
+                                  batch_size=1,
+                                  shuffle=True)
+    
+    print(next(iter(train_dataloader)))
+
+# %%
