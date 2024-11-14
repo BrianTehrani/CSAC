@@ -12,9 +12,9 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset, DataLoader
 
-DATAFOLDER_FAIL = r"D:\Data\Tempco\fail"
-DATAFOLDER_PASS = r"D:\Data\Tempco\pass"
-DATAFOLDER_FAIL_PASSEDLATER = r"D:\Data\Tempco\fail_passedLater"
+# DATAFOLDER_FAIL = r"D:\Data\Tempco\fail"
+# DATAFOLDER_PASS = r"D:\Data\Tempco\pass"
+# DATAFOLDER_FAIL_PASSEDLATER = r"D:\Data\Tempco\fail_passedLater"
 
 #List of paramaters to drop from tempco data
 #NOTE: Trial and error. Can adjust to data model needs
@@ -347,7 +347,7 @@ if __name__ == "__main__":
 
     train_dataloader = DataLoader(dataset=clock_dataset_train,
                                   batch_size=1,
-                                  shuffle=True)
+                                  shuffle=False)
     
     print(next(iter(train_dataloader)))
 
