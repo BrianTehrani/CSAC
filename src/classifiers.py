@@ -49,6 +49,6 @@ class PtClassifier_V2(nn.Module):
     def save(state_dict, folderPath:str, model_num:int):
         torch.save(
             obj=state_dict,
-            f=folderPath + r'/Models/csac_ml_' + str(model_num) + r'.pt'
+            f=folderPath + r'/models/csac_ml_' + str(model_num) + r'.pth'
         )
-        print("Model saved to: " + folderPath + r'/Models/csac_ml_' + str(model_num) + r'.pt')
+        print("Model saved to: " + folderPath + r'/models/csac_ml_' + str(model_num) + r'.pth')

@@ -1,7 +1,7 @@
 """
     Functions to handle model training.
 """
-import torch, sys
+import torch
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -12,18 +12,19 @@ def train_step(
         loss_fn:torch.nn.Module,
         device:torch.device):
     
+    # Set model to train
     model.train()
-    # Setup train loss and train accuracy values
-    train_loss, train_acc = 0, 0
+
+    # Initialize training metrics for loss, accuracy
+    # Keep counting merics for clock number and data training
+    train_loss, train_acc, label_in_row, clock_num = 0, 0, 0, 0
     train_loss_each_clock = []
     train_acc_each_clock = []
-    clock_num = 0
-    label_in_row = 0
 
     # Loop through data loader data batches
-    for batch, (x, y, cols, validation) in enumerate(dataloader):
+    for batch, (X, y, cols, validation) in enumerate(dataloader):
         # Send data to target device
-        x, y = x.to(device), y.to(device)
+        X, y = X.to(device), y.to(device)
 
         """
             Each row in clock data needs to be used as input to model.
@@ -38,42 +39,105 @@ def train_step(
                 3) Accumulate loss and accuracy metrics per clock 
         """
 
-        for clock in x:
-            print(f"Training Clock: {clock_num} | {validation}")
+        for row in X[0]: #X[0] represents entire clock data
+            # 1. Forward pass
+            y_pred = model(row)
+            pred = 0 if torch.tanh(y_pred) < 0 else 1
+            # print(f"y_pred: {pred} | Act: {y[0][label_in_row].item()} | On row number: {label_in_row}", end='\r')
 
-            for row in clock:
-                # 1. Forward pass
-                y_pred = model(row)
-                pred = 0 if torch.tanh(y_pred) < 0 else 1
-                # print(f"y_pred: {pred} | Act: {y[0][label_in_row].item()} | On row number: {label_in_row}", end='\r')
+            # 2. Calculate  and accumulate loss
+            loss = loss_fn(y_pred, y[0][label_in_row].float())
+            train_loss += loss.item()
+            if pred ==  y[0][label_in_row].item():
+                train_acc = train_acc + 1
+            label_in_row = label_in_row + 1
 
-                # 2. Calculate  and accumulate loss
-                loss = loss_fn(y_pred, y[0][label_in_row].float())
-                train_loss += loss.item()
-                if pred ==  y[0][label_in_row].item():
-                    train_acc = train_acc + 1
-                label_in_row = label_in_row + 1
+            # 3. Optimizer zero grad
+            optimizer.zero_grad()
 
-                # 3. Optimizer zero grad
-                optimizer.zero_grad()
+            # 4. Loss backward
+            loss.backward()
 
-                # 4. Loss backward
-                loss.backward()
+            # 5. Optimizer step
+            optimizer.step()
 
-                # 5. Optimizer step
-                optimizer.step()
-
-                # Calculate and accumulate accuracy metric across all batches
-                # y_pred_class = torch.argmax(torch.softmax(y_pred, dim=0), dim=1)
-                # train_acc += (y_pred_class == y).sum().item()/len(y_pred)
-            clock_num = clock_num + 1
-            train_loss_each_clock.append(train_loss/len(clock))
-            train_acc_each_clock.append(train_acc/len(clock))
-            train_loss, train_acc, label_in_row = 0, 0, 0
-            print()
+        clock_num = clock_num + 1
+        train_loss_each_clock.append(train_loss/len(X[0]))
+        train_acc_each_clock.append(train_acc/len(X[0]))
+        train_loss, train_acc, label_in_row = 0, 0, 0
+        print()
 
     # Adjust metrics to get average loss and accuracy per batch 
     return train_loss_each_clock, train_acc_each_clock
+
+def train_step_batch(
+        dataloader:DataLoader,  
+        model:torch.nn.Module, 
+        optimizer:torch.optim.Optimizer, 
+        loss_fn:torch.nn.Module,
+        device:torch.device,
+        batch_size:int):
+    
+    # Initializing parameters and put model into training
+    train_loss, train_acc, clock_num = 0, 0, 0
+    train_loss_per_clock, train_acc_per_clock = {}, {}
+    model.train()
+
+
+    # Get data from the dataloader and send data to target device
+    for b, (X, y, cols, validation) in enumerate(dataloader):
+        print(f"Training Clock | {clock_num}")
+        X, y = X.to(device), y.to(device)
+
+        # Loop through single clock data with size of batch
+        for i in range(0, len(X[0]), batch_size): # X[0] is clock data
+            
+            # Forward pass on batch data
+            y_preds_batch = model(X[0][i:i+batch_size])
+
+            '''
+                Since we are using BCEWithLogitsLoss, it provides a Sigmoid clamp function for input x.
+                Providing a batch of inputs will return an average loss accross the batch.
+            '''
+            # Calculate Loss
+            loss = loss_fn(y_preds_batch, y[0][i:i+batch_size].float())
+            train_loss += loss.item()
+
+            # y_preds_batch = torch.tanh(y_preds_batch).squeeze().cpu().numpy()
+            # for i, y_pred in enumerate(y_preds_batch):
+            #     if y_pred < 0:
+            #         y_preds_batch[i] = 0
+            #     else:
+            #         y_preds_batch[i] = 1
+            
+            # y_preds_batch_np = y_preds_batch
+            # y_preds_batch = torch.tensor(y_preds_batch, dtype=torch.float).unsqueeze(1).to(device)
+            # y_batch = y[0][i:i+batch_size]
+
+            # 6) Calculate Accuracy
+            # y_preds_batch_acc = torch.where(torch.sigmoid(y_preds_batch).squeeze() >= 0.5, torch.tensor(1, dtype=torch.int64), torch.tensor(0, dtype=torch.int64))
+            y_preds_batch_acc = torch.round(torch.sigmoid(y_preds_batch).squeeze()).to(torch.int64)
+            train_acc = torch.sum(torch.eq(y_preds_batch_acc, y[0][i:i+batch_size].squeeze()))
+
+            # 7) Ensure backpropagation without gradient tracking
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        train_loss_per_clock["Clock_"+str(clock_num)] = []
+        train_loss_per_clock["Clock_"+str(clock_num)].append(train_loss) #number of batches
+
+        train_acc_per_clock["Clock_"+str(clock_num)] = []
+        train_acc_per_clock["Clock_"+str(clock_num)].append(train_acc/len(X[0]))
+        #train_loss_per_clock.append(train_loss/batch_size)
+        clock_num += 1
+        train_loss, train_acc = 0, 0
+        
+    return train_loss_per_clock, train_acc_per_clock
+
+'''
+    Testing
+'''
 
 def test_step(
         dataloader:DataLoader,  
@@ -92,13 +156,13 @@ def test_step(
 
             print(f"Testing Clock: {clock_num} | {validation[0]}")
             for row in x[0]: #x[0] == clock loop
-                # 1. Forward pass
+                # Forward pass
                 y_test_pred = model(row)
                 
                 pred = 0 if torch.tanh(y_test_pred) < 0 else 1
                 print(f"y_pred: {pred} | Act: {y[0][label_in_row].item()} | On row number: {label_in_row}", end='\r')
 
-                # 2. Calculate  and accumulate loss and accuracy
+                # Calculate  and accumulate loss and accuracy
                 loss = loss_fn(y_test_pred, y[0][label_in_row].float())
                 test_loss += loss.item()
 
@@ -114,6 +178,62 @@ def test_step(
             
     return test_loss_each_clock, test_acc_each_clock
 
+def test_step_batch(
+        dataloader:DataLoader,  
+        model:torch.nn.Module, 
+        loss_fn:torch.nn.Module,
+        device:torch.device,
+        batch_size:int):
+    '''
+        Test on a batch size of individual clock data. The batches correspond to a seconds worth of 
+        parameter data. 
+    '''
+    # Set model to training and initialize variables
+    model.eval()
+    test_loss, test_acc, clock_num = 0, 0, 0
+    test_loss_each_clock, test_acc_each_clock = [], []
+
+    # Turn of grad and optimize testing
+    with torch.inference_mode():
+        for b, (X, y, cols, validation) in enumerate(dataloader):
+
+            # Send data to target device
+            X, y = X.to(device), y.to(device)
+            print(f"Testing Clock: {clock_num} | {validation[0]}")
+
+            # Loop through clock data and perform batch testing
+            for i in range(0, len(X[0]), batch_size):
+                y_preds_batch = model(X[0][i:i+batch_size])
+                
+                # Calculate Loss
+                loss = loss_fn(y_preds_batch, y[0][i:i+batch_size].float())
+                test_loss += loss.item()
+
+                # Convert predicted batch into prediction values of 0 - PASS or 1 - FAIL
+                # y_preds_batch = torch.tanh(y_preds_batch).squeeze().cpu().numpy()
+                # for n, y_pred in enumerate(y_preds_batch):
+                #     if y_pred < 0:
+                #         y_preds_batch[n] = 0
+                #     else:
+                #         y_preds_batch[n] = 1
+                # y_preds_batch_np = y_preds_batch
+                # y_preds_batch = torch.tensor(y_preds_batch, dtype=torch.float).unsqueeze().to(device)
+                # y_batch = y[0][i:i+batch_size]
+
+                # Calculate Accuracy
+                y_preds_batch_acc = torch.round(torch.sigmoid(y_preds_batch).squeeze()).to(torch.int64)
+                test_acc = torch.sum(torch.eq(y_preds_batch_acc, y[0][i:i+batch_size].squeeze()))
+
+            test_loss_each_clock.append(test_loss)
+            test_acc_each_clock.append(test_acc/len(X[0]))
+            clock_num += 1
+            test_loss, test_acc = 0, 0
+
+    return test_loss_each_clock, test_acc_each_clock
+
+'''
+    Training combined
+'''
 def train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           test_dataloader: DataLoader, 
@@ -161,3 +281,35 @@ def train(model: torch.nn.Module,
 
     # Return the filled results at the end of the epochs
     return results
+
+def train_batch(
+        model: torch.nn.Module, 
+        train_dataloader: DataLoader, 
+        test_dataloader: DataLoader, 
+        optimizer: torch.optim.Optimizer,
+        loss_fn: torch.nn.Module,
+        epochs: int,
+        device: torch.device,
+        batch_size:int):
+    
+    for epoch in tqdm(range(epochs)):
+        print(f"Epoch: {epoch}")
+
+        train_loss, train_acc = train_step_batch(
+            model=model,
+            dataloader=train_dataloader,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            device=device,
+            batch_size=batch_size
+        )
+        
+        test_loss, test_acc = test_step_batch(
+            dataloader=test_dataloader,
+            model=model,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
+            device=device
+        )
+
+    return train_loss, train_acc, test_loss, test_acc
