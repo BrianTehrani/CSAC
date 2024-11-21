@@ -310,10 +310,11 @@ class ClockDataset(Dataset):
         
         Will only include clock params that are not in list L_DROP_PARAMS.
     '''
-    def __init__(self, f_data:str, transform=None) -> None:
+    def __init__(self, f_data:str, transform=None, training_data=False) -> None:
         super().__init__()
         self.f_clock_paths = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(f_data) for f in filenames]
         self.transform = transform
+        self.training_data = training_data
     
     def __len__(self) -> int:
         return len(self.f_clock_paths)
@@ -323,14 +324,16 @@ class ClockDataset(Dataset):
         clock_validation = os.path.basename(os.path.dirname(clock_path))
         
         clock_data = parseLogDataFrame(pd.read_csv(clock_path))
-
-        clock_params = torch.Tensor(clock_data.iloc[:, :-1].to_numpy()).to(torch.float32)
-        clock_param_labels =  torch.Tensor(clock_data.iloc[:, -1].to_numpy()).unsqueeze(1).to(torch.int64)
+        clock_params = clock_data.iloc[:, :-1].to_numpy()
+        clock_param_labels = torch.Tensor(clock_data.iloc[:, -1].to_numpy()).unsqueeze(1).to(torch.int64)
         clock_columns = clock_data.columns.to_list()
 
-        # if self.transform:
-        #     scalar = StandardScaler()
-        #     clock_params = scalar.fit_transform(self.transform(clock_params))
+        if self.transform:
+            s = StandardScaler()
+            clock_params = s.fit_transform(clock_data.iloc[:, :-1].to_numpy())
+            clock_params = torch.Tensor(clock_params).to(torch.float32)
+        else:
+            clock_params = torch.Tensor(clock_params).to(torch.float32)
 
         return clock_params, clock_param_labels, clock_columns, clock_validation
 
