@@ -12,7 +12,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset, DataLoader
 
-# DATAFOLDER_FAIL = r"D:\Data\Tempco\fail"
+DATAFOLDER_FAIL = r"D:\Data\Tempco\fail"
 # DATAFOLDER_PASS = r"D:\Data\Tempco\pass"
 # DATAFOLDER_FAIL_PASSEDLATER = r"D:\Data\Tempco\fail_passedLater"
 
@@ -322,6 +322,8 @@ class ClockDataset(Dataset):
     def __getitem__(self, index):
         clock_path = self.f_clock_paths[index]
         clock_validation = os.path.basename(os.path.dirname(clock_path))
+        clock_sn = os.path.basename(clock_path)
+        clock_sn = clock_sn[clock_sn.find("-")+1:clock_sn.find("_")]
         
         clock_data = parseLogDataFrame(pd.read_csv(clock_path))
         clock_params = clock_data.iloc[:, :-1].to_numpy()
@@ -335,7 +337,7 @@ class ClockDataset(Dataset):
         else:
             clock_params = torch.Tensor(clock_params).to(torch.float32)
 
-        return clock_params, clock_param_labels, clock_columns, clock_validation
+        return clock_params, clock_param_labels, clock_columns, clock_sn, clock_validation
 
 #%%
 if __name__ == "__main__":
